@@ -135,16 +135,15 @@ def PlotWigner(W):
     extent = [-X_amplitude, X_amplitude - dX, -P_amplitude, P_amplitude - dP]
     plt.imshow(fftpack.fftshift(W), extent=extent, origin='lower', interpolation='nearest')
     plt.xlabel('$x$ (a.u.)')
-    plt.ylabel('$p$ (a.u.)')
+    plt.colorbar(ticks=[W.min(), 0.5*(W.min() + W.max()), W.max()], shrink=0.9)
 
-    plt.colorbar(ticks=[W.min(), 0.5*(W.min() + W.max()), W.max()])
-
-plt.subplot(211)
+plt.subplot(121)
 PlotWigner(GibbsW)
 #plt.title("Log plot of Gibbs state Wigner function $\\left(\\log|W_{xp}|\\right)$")
 plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(a)', color='white', fontsize=15)
+plt.ylabel('$p$ (a.u.)')
 
-plt.subplot(212)
+plt.subplot(122)
 PlotWigner(W)
 #plt.title("Log plot of Wigner function of \nGibbs state propagated via Moyal equation $\\left(\\log|W_{xp}|\\right)$")
 plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(b)', color='white', fontsize=15)
