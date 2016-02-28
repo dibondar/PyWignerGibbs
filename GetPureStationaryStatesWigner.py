@@ -52,37 +52,12 @@ P = fftpack.fftshift(P_range)[:,np.newaxis]
 #
 ##################################################################
 
-gridDIM = X_gridDIM
+# Construct the Hamiltonian in the coordinate basis
+Hamiltonian_XBasis = fftpack.fft(np.diag(K(2*np.pi*fftpack.fftfreq(X_gridDIM, dX))), axis=1, overwrite_x=True)
+Hamiltonian_XBasis = fftpack.ifft(Hamiltonian_XBasis, axis=0, overwrite_x=True)
+Hamiltonian_XBasis += np.diag(V(X_range))
 
-def OperatorP_XBasis():
-    """
-    P operator in X basis
-    """
-    n = np.arange(gridDIM)[np.newaxis,:]
-    n = 0.5*(2.*n - gridDIM + 1.)
-
-    m = np.arange(gridDIM)[:,np.newaxis]
-    m = 0.5*(2.*m - gridDIM + 1.)
-
-    pi = np.pi
-    P = (np.sin(pi*(n-m))*np.cos(pi*(n-m)/gridDIM) - gridDIM*np.cos(pi*(n-m))*
-         np.sin(pi*(n-m)/gridDIM)) / np.sin(pi*(n-m)/gridDIM)**2
-
-    P = np.nan_to_num(P)
-
-    return pi*1j/(dX*gridDIM**2) *P
-
-def OperatorX_XBasis():
-    """
-    X operator in X basis
-    """
-    return np.diag(np.linspace(-X_amplitude + 0.5*dX, X_amplitude - 0.5*dX, gridDIM))
-
-# construct Hamiltonian and coordinate representation
-OpP = OperatorP_XBasis()
-Hamiltonian_XBasis = K(1.)*OpP.dot(OpP) + V(OperatorX_XBasis())
-
-print("\nEnergy of ground and excited states %s\n" % np.linalg.eigvalsh(Hamiltonian_XBasis).real[:2])
+print("Eigenvalues of Hamiltonian %s\n" % np.linalg.eigvalsh(Hamiltonian_XBasis)[:2].real)
 
 ##################################################################
 #
