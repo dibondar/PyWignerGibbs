@@ -4,19 +4,17 @@ Thomas-Fermi and Bose-Einstein statistics
 """
 import numpy as np
 import scipy.fftpack as fftpack
-from scipy.linalg import expm, solve
 import matplotlib.pyplot as plt
 
-# Specify Hamiltonian of the system:
-#  This More potential was takne from the paper http://dx.doi.org/10.1103/PhysRevLett.114.050401
-V = lambda x: 15.*(np.exp(-0.5*(x-disp)) - 2.*np.exp(-0.25*(x-disp)))
+# Specify Hamiltonian of the system
+V = lambda x: -0.05*x**2 + 0.03*x**4
 K = lambda p: 0.5*p**2
 
 # Chemical potential
 mu = 0
 
 # Inverse temperature for final state
-beta = 5.
+beta = 1.5
 
 ####################################################
 #
@@ -28,8 +26,8 @@ beta = 5.
 X_gridDIM = 512       # Discretization grid size in X
 P_gridDIM = 512         # Discretization grid size in P
 
-X_amplitude = 8.         # Window range -X_amplitude to X_amplitude
-P_amplitude = 9.        # Window range -P_amplitude to P_amplitude
+X_amplitude = 5.         # Window range -X_amplitude to X_amplitude
+P_amplitude = 5.        # Window range -P_amplitude to P_amplitude
 
 # Discretization resolution
 dX = 2.*X_amplitude/float(X_gridDIM)
@@ -53,28 +51,6 @@ Theta = fftpack.fftshift(Theta_range)[:,np.newaxis]
 
 Lambda = fftpack.fftshift(Lambda_range)[np.newaxis,:]
 P = fftpack.fftshift(P_range)[:,np.newaxis]
-
-#################################################################################
-#
-# Position the potential such that numerical simulations are balanced
-#
-#################################################################################
-
-
-def obj(new_disp):
-    """
-    Objective function to find the displacement
-    """
-    potential = V(X_range - new_disp)
-    min_indx = np.argmin(potential)
-    return np.abs(potential[:min_indx].sum() - potential[min_indx:].sum())
-
-# First asssume no displacement
-disp = 0
-from scipy.optimize import minimize_scalar
-
-# find new displacement
-disp = minimize_scalar(obj).x
 
 #################################################################################
 #
@@ -106,6 +82,12 @@ W = np.ones((P.size, X.size), dtype=np.complex)
 W_even_pows = np.zeros_like(W)
 W_odd_pows = np.zeros_like(W)
 
+# Constants to account for the chemical potential.
+# this variable will store exp(k*mnu*beta) for current value of k,
+# this is a coefficient in front of the Gibbs state with temperature k*beta
+exp_k_mu_beta = np.exp(mu*beta)
+exp_mu_beta = np.exp(mu*beta)
+
 # Order in taylor series
 k = 0
 
@@ -113,7 +95,7 @@ k = 0
 while True:
     k += 1
 
-    # Propagate to get the nest term in taylor expansion
+    # Propagate to get the nested terms in taylor expansion
     for _ in xrange(BetaIterSteps):
         # p x -> theta x
         W = fftpack.fft(W, axis=0, overwrite_x=True)
@@ -167,14 +149,17 @@ while True:
     #
     #################################################################################
 
+    # update the value of the coefficient in front of the Gibbs state with temperature k*beta
+    exp_k_mu_beta *= exp_mu_beta
+
     # Add correction into the corresponding
     if k % 2 == 0:
-        W_even_pows += W
+        W_even_pows += exp_k_mu_beta * W
     else:
-        W_odd_pows += W
+        W_odd_pows += exp_k_mu_beta * W
 
     # check for convergence
-    peak_val = np.linalg.norm(np.ravel(W), np.inf) # maximum value of Wigner func
+    peak_val = exp_k_mu_beta * np.linalg.norm(np.ravel(W), np.inf) # maximum value of Wigner func
     print("Iteration %d, norm %.4f, Wigner func peak value %.5f" % (k, norm, peak_val))
     if norm < 1e-4:
         # result converged
@@ -196,152 +181,41 @@ W_BE /= W_BE.sum()*dX*dP
 
 #################################################################################
 #
-# Verify that the obtained state is stationary w.r.t. the Moyal equation
-#
-#################################################################################
-
-def MoyalPropagation(W):
-    """
-    Propagate wigner function W by the Moyal equation.
-    This function is used to verify that the obtained wigner functions
-    are steady state solutions of the Moyal equation.
-    """
-    dt = 0.005 # time increment
-    TIterSteps = 500
-
-    # Make copy
-    W = np.copy(W)
-
-    # Pre-calculate exp
-    expIV = np.exp(-1j*dt*(V(X - 0.5*Theta) - V(X + 0.5*Theta)))
-    expIK = np.exp(-1j*dt*(K(P + 0.5*Lambda) - K(P - 0.5*Lambda)))
-
-    for _ in xrange(TIterSteps):
-        # p x -> theta x
-        W = fftpack.fft(W, axis=0, overwrite_x=True)
-        W *= expIV
-        # theta x  ->  p x
-        W = fftpack.ifft(W, axis=0, overwrite_x=True)
-
-        # p x  ->  p lambda
-        W = fftpack.fft(W, axis=1, overwrite_x=True)
-        W *= expIK
-        # p lambda  ->  p x
-        W = fftpack.ifft(W, axis=1, overwrite_x=True)
-
-        # normalization
-        W /= W.real.sum()*dX*dP
-
-    return W.real
-
-#################################################################################
-#
 #   Plot the comparison
 #
 #################################################################################
 
 def PlotWigner(W):
-    #
-    W = np.abs(W.real)
-    W /= W.max()
-    W = np.log10(W)
-    #cut_off = -16
-    cut_off = np.floor(W.min()) + 1
-    W[np.nonzero(W < cut_off)] = cut_off
-
-    extent = [-X_amplitude, X_amplitude - dX, -P_amplitude, P_amplitude - dP]
-    plt.imshow(fftpack.fftshift(W), extent=extent, origin='lower', interpolation='nearest')
-    plt.colorbar(ticks=[W.min(), 0.5*(W.min() + W.max()), W.max()], shrink=0.9)
-
-
-plt.subplot(221)
-PlotWigner(W_BE)
-plt.title("Bose-Einstein (BE) Wigner function")
-
-plt.subplot(222)
-PlotWigner(W_TF)
-plt.title("Thomas-Fermi (TF) Wigner function")
-
-plt.subplot(223)
-plt.semilogy(X_range, fftpack.fftshift(W_BE).sum(axis=0)*dP, '-r', label='Wigner BE')
-plt.title('BE')
-
-plt.subplot(224)
-plt.semilogy(X_range, fftpack.fftshift(W_TF).sum(axis=0)*dP, '-r', label='Wigner TF')
-plt.title('TF')
-
-plt.show()
-
-
-"""
-def PlotWigner(W, global_color_min, global_color_max):
-    "
+    """
     Plot the Wigner function
-    "
+    """
     W = fftpack.fftshift(W)
 
     # Generate Wigner color map
-    global_color_max = W.max()  # Maximum value used to select the color range
-    global_color_min = W.min()  #
-
-    # adjust minimum bound so that it is at least 2% of the max
-    global_color_min = min(global_color_min, -0.02*abs(global_color_max))
-
-    zero_position = abs(global_color_min) / (abs(global_color_max) + abs(global_color_min))
-    wigner_cdict = {'red' 	:   ((0., 0., 0.),
-                                  (zero_position, 1., 1.),
-                                  (1., 1., 1.)),
-                    'green' :	((0., 0., 0.),
-                                  (zero_position, 1., 1.),
-                                  (1., 0., 0.)),
-                    'blue'	:	((0., 1., 1.),
-                                    (zero_position, 1., 1.),
-                                    (1., 0., 0.))
-                    }
-    wigner_cmap = plt.cm.colors.LinearSegmentedColormap('wigner_colormap', wigner_cdict, 1024)
+    global_color_max = 0.15  # Maximum value used to select the color range
+    global_color_min = 0  #
 
     extent = [-X_amplitude, X_amplitude - dX, -P_amplitude, P_amplitude - dP]
 
     plt.imshow(W, origin='lower', extent=extent,
-               vmin= global_color_min, vmax=global_color_max, cmap=wigner_cmap)
+               vmin= global_color_min, vmax=global_color_max, cmap='Reds')
     plt.xlabel('$x$ (a.u.)')
-    plt.colorbar(pad=0, shrink=0.9)
+    plt.colorbar(pad=0, shrink=0.5)
 
-global_color_min = W_TF.min()
-global_color_max = W_TF.max()
-
-plt.subplot(231)
-PlotWigner(W_BE)
-plt.title("Bose-Einstein (BE) Wigner function")
-#plt.title("Log plot of Wigner function $\\left(\\log|W_{xp}|\\right)$")
-#plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(a)', color='white', fontsize=15)
-plt.ylabel('$p$ (a.u.)')
-
-plt.subplot(232)
-PlotWigner(W_TF)
-plt.title("Thomas-Fermi (TF) Wigner function")
-
-plt.subplot(233)
+plt.subplot(131)
 PlotWigner(W_Gibbs)
+plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(a)', color='k', fontsize=15)
 plt.title("Gibbs Wigner function")
-
-plt.subplot(234)
-PlotWigner(MoyalPropagation(W_BE))
-plt.xlabel('$x$ (a.u.)')
 plt.ylabel('$p$ (a.u.)')
-plt.title("BE Wigner function after Moyal propagation")
-#plt.title("Log plot of Wigner function propagated via Moyal equation $\\left(\\log|W_{xp}|\\right)$")
-#plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(b)', color='white', fontsize=15)
 
-plt.subplot(235)
-PlotWigner(MoyalPropagation(W_TF))
-plt.xlabel('$x$ (a.u.)')
-plt.title("TF Wigner function after Moyal propagation")
+plt.subplot(132)
+PlotWigner(W_BE)
+plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(b)', color='k', fontsize=15)
+plt.title("Bose-Einstein Wigner function")
 
-plt.subplot(236)
-PlotWigner(MoyalPropagation(W_Gibbs))
-plt.xlabel('$x$ (a.u.)')
-plt.title("Gibbs Wigner function after Moyal propagation")
+plt.subplot(133)
+PlotWigner(W_TF)
+plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(c)', color='k', fontsize=15)
+plt.title("Thomas-Fermi Wigner function")
 
 plt.show()
-"""
