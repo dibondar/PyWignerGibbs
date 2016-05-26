@@ -307,13 +307,13 @@ def PlotWigner(W):
 
 plt.subplot(221)
 PlotWigner(W_ground)
-plt.title("Ground state\nWigner function")
+#plt.title("Ground state\nWigner function")
 plt.text(0.6*X_amplitude, -0.8*P_amplitude, '(a)', fontsize=15)
 plt.ylabel('$p$ (a.u.)')
 
 plt.subplot(222)
 PlotWigner(W_exited1)
-plt.title("First exited state\nWigner function")
+#plt.title("First exited state\nWigner function")
 plt.text(0.6*X_amplitude, -0.8*P_amplitude, '(b)', fontsize=15)
 
 def MarginalPlot(W):

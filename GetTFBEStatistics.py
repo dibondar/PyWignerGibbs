@@ -199,23 +199,25 @@ def PlotWigner(W):
 
     plt.imshow(W, origin='lower', extent=extent,
                vmin= global_color_min, vmax=global_color_max, cmap='Reds')
-    plt.xlabel('$x$ (a.u.)')
-    plt.colorbar(pad=0, shrink=0.5)
+    plt.colorbar(pad=0, shrink=1, ticks=[0.0, 0.075, 0.15])
 
-plt.subplot(131)
+plt.subplot(221)
 PlotWigner(W_Gibbs)
-plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(a)', color='k', fontsize=15)
-plt.title("Gibbs Wigner function")
+plt.text(0.6*X_amplitude, -0.8*P_amplitude, '(a)', color='k', fontsize=15)
 plt.ylabel('$p$ (a.u.)')
+#plt.title("Gibbs Wigner function")
 
-plt.subplot(132)
+plt.subplot(222)
 PlotWigner(W_BE)
-plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(b)', color='k', fontsize=15)
-plt.title("Bose-Einstein Wigner function")
+plt.text(0.6*X_amplitude, -0.8*P_amplitude, '(b)', color='k', fontsize=15)
+#plt.title("Bose-Einstein Wigner function")
+plt.xlabel('$x$ (a.u.)')
 
-plt.subplot(133)
+plt.subplot(223)
 PlotWigner(W_TF)
-plt.text(0.7*X_amplitude, -0.8*P_amplitude, '(c)', color='k', fontsize=15)
-plt.title("Thomas-Fermi Wigner function")
+plt.text(0.6*X_amplitude, -0.8*P_amplitude, '(c)', color='k', fontsize=15)
+#plt.title("Thomas-Fermi Wigner function")
+plt.ylabel('$p$ (a.u.)')
+plt.xlabel('$x$ (a.u.)')
 
 plt.show()
